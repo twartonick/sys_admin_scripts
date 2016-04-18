@@ -1,0 +1,55 @@
+#!/bin/bash
+
+# This is the beginnings of a script to find annoying wp-login crack attempts. Not Prod ready.
+
+# TODO: Add list or block of IP's we DO NOT want to block, such as the host server IPs, our own IP, etc.
+
+# Input Variable, number times IP attempted wp-login
+
+THRESHOLD=$1
+
+# First, save current iptables!
+
+/sbin/service iptables save
+
+/sbin/service iptables restart
+
+# Next, scan thru access logs on cPanel shared host.
+
+/bin/grep -R "wp-login.php" /usr/local/apache/domlogs/* | grep "POST" | awk -F: '{ print $2 }' | awk '{print $1}' | sort | uniq -c | sort -n' >> /tmp/wp-login_attempts_`date +%d-%b-%Y-%H`.log
+
+
+
+# Now that we have our list of addresses, we need to create iptables rules for those over our threshold.
+# This block is still work in progress, I can't remember where I copied this from to attribute. Not to be used yet!!
+#
+
+for i in /tmp/wp-login_attempts_`date +%d-%b-%Y-%H`.log
+do
+ TIMES=`/bin/echo $i | /bin/awk -F":" '{print $1}'`
+ IPADDRESS=`/bin/echo $i | /bin/awk -F":" '{print $2}'`
+ if [ ${TIMES} -ge ${THRESHOLD} ]
+ then
+ echo "Attack Detected: ${IPADDRESS} had ${TIMES} instances! "
+ # Verify that the address hasn't already been added to iptables
+ if ! grep -q ${IPADDRESS} /etc/sysconfig/iptables
+ then
+ # Add an iptables firewall rule
+ /sbin/iptables -I INPUT -s ${IPADDRESS} -j DROP
+ /sbin/iptables -A OUTPUT -p tcp -d ${IPADDRESS} -j DROP
+ # Log this event using the syslog facility
+ /usr/bin/logger -p local0.info -t "- $0 detected WordPress brute force attack from ${IPADDRESS}. Blocking this address in iptables."
+ 
+ fi
+ fi
+done
+
+# Save our rules
+/sbin/service iptables save
+# restart iptables
+/sbin/service iptables restart
+
+
+
+#If we should want to automate this....
+#sudo ./wp-login_cpanel_ban.sh <threshold>
