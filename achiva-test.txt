@@ -1,0 +1,28 @@
+FROM debian:stable-slim
+
+
+RUN groupadd archiva && useradd -g testadmin testadmin
+
+ENV VERSION 2.2.3
+ENV USERNAME admin
+ENV PASSWORD ch4ngm3
+
+
+
+RUN sudo apt-get update \
+        && sudo apt-get -y install openjdk-8-jre-headless \
+        && sudo apt-get -y install curl \
+        && sudo apt-get -y install wget \
+        && sudo apt-get -y install ssh cron at logrotate \
+        && sudo apt-get -y install net-tools netstat htop \
+        && sudo apt-get -y -u dist-upgrade \
+        && sudo apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* \
+        && wget -c http://apache.cs.utah.edu/archiva/$VERSION/binaries/apache-archiva-$VERSION-bin.tar.gz  \ 
+        && tar xfv apache-archiva-$VERSION-bin.tar.gz \
+        && sudo mv apache-archiva-$VERSION /opt/
+
+WORKDIR [/opt/apache-archiva-$VERSION/bin/]
+
+EXPOSE 8080/tcp
+
+ENTRYPOINT /opt/apache-archiva-$VERSION/bin/archiva console
